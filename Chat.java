@@ -1,8 +1,6 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.util.Objects;
 
 public class Chat {
     public static void main(String[] args) throws IOException {
@@ -25,108 +23,81 @@ public class Chat {
 }
 
 class WriteThread extends Thread {
-    BufferedReader standardInput;  // to read socket input
-    BufferedReader socketInput;
-    private Socket remoteSocket; //socket that listens to other user
-    private ObjectOutputStream outputStream; // stream to write to the socket
-
     public void run() {
         try {
-            standardInput = new BufferedReader(new InputStreamReader(System.in));
+            // connect to another user's port
+            BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
+            System.out.print("Enter port number to connect to: ");
+            int remotePort = Integer.parseInt(stdIn.readLine());
+            Socket socket = new Socket("localhost", remotePort);
+            System.out.println("\nConnected to: " + socket.getRemoteSocketAddress());
 
-            // connect to other user's port
-            System.out.println("What's the port of the user you'd like to connect to?");
-            remoteSocket = new Socket("localhost", Integer.parseInt(standardInput.readLine()));
-            System.out.println("Connected to " + remoteSocket.getRemoteSocketAddress() + " successfully!\n");
-
-            // reading message from output
-            outputStream = new ObjectOutputStream(remoteSocket.getOutputStream());
-            standardInput = new BufferedReader(new InputStreamReader(remoteSocket.getInputStream()));
-            //message received from the remote port
-            String message;
-            while ((message = standardInput.readLine()) != null) {
-                // writing message to output stream
-                outputStream.writeObject(message);
-                outputStream.flush();
-
-                // handling command "transfer <fileName>"
-                if (message.startsWith("transfer")) {
-                    String fileName = message.substring(9);
-                    boolean flag = false;
-                    // current working directory of this thread
-                    String currentDirectory = "./";
-                    File folder = new File(currentDirectory);
-
-                    for (File file : Objects.requireNonNull(folder.listFiles())) {
-                        if (file.getName().equals(fileName)) {
-                            System.out.println("Found file " + file.getName() + " in working directory, commencing transfer.");
-                            flag = true;
-                            byte[] content = Files.readAllBytes(file.toPath());
-                            outputStream.writeObject(content);
-                            outputStream.flush();
-                            System.out.println("File " + file.getName() + " transferred successfully!");
+            // start file transfer or message sending loop
+            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String userInput;
+            while ((userInput = stdIn.readLine()) != null) {
+                out.println(userInput);
+                if (userInput.startsWith("transfer ")) {
+                    String fileName = userInput.substring(9);
+                    File file = new File(fileName);
+                    if (!file.exists()) {
+                        System.out.println("File does not exist.");
+                    } else {
+                        FileInputStream fileInputStream = new FileInputStream(file);
+                        byte[] buffer = new byte[1024];
+                        int bytesRead;
+                        while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                            socket.getOutputStream().write(buffer, 0, bytesRead);
                         }
-                    }
-                    if (!flag) {
-                        System.out.println("ERROR - File not found in this working directory!");
+                        socket.getOutputStream().flush();
+                        fileInputStream.close();
                     }
                 }
             }
-        } catch (Exception e) {
+
+            // close socket and streams
+            out.close();
+            in.close();
+            socket.close();
+        } catch (IOException e) {
             e.printStackTrace();
-        } finally {
-            try {
-                outputStream.flush();
-                outputStream.close();
-                socketInput.close();
-                remoteSocket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 }
 
 class ReadThread extends Thread {
-    BufferedReader socketInput; // to receive input from user
-    ObjectInputStream inputStream; // stream to read socket input
-    private final Socket socket;    // socket that listens to client
-    String currentDirectory = "./"; // current working directory of this thread
+    private Socket socket;
 
     public ReadThread(Socket socket) {
         this.socket = socket;
     }
 
-    public void run()   {
+    public void run() {
         try {
-            // reading incoming messages
-            socketInput = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            // message received from the client
-            String message;
-            while ((message = socketInput.readLine()) != null) {
-
-                // handling file transfer - obtaining transferred file and storing it
-                if (message.startsWith("transfer")) {
-                    inputStream = new ObjectInputStream(socket.getInputStream());
-                    String fileName = message.substring(9);
-                    File file = new File(currentDirectory + "new" + fileName);
-                    byte[] content = (byte[]) inputStream.readObject();
-                    Files.write(file.toPath(), content);
-                    System.out.println("File " + fileName + ": get is successful.");
+            // read incoming messages and print them to the console
+            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String inputLine;
+            while ((inputLine = in.readLine()) != null) {
+                if (inputLine.startsWith("transfer ")) {
+                    String fileName = "new" + inputLine.substring(9);
+                    FileOutputStream fileOutputStream = new FileOutputStream(fileName);
+                    byte[] buffer = new byte[1024];
+                    int bytesRead;
+                    while ((bytesRead = socket.getInputStream().read(buffer)) != -1) {
+                        fileOutputStream.write(buffer, 0, bytesRead);
+                    }
+                    fileOutputStream.close();
                 } else {
-                    // printing messages to console
-                    System.out.println(message);
+                    System.out.println(inputLine);
                 }
             }
-        } catch(Exception e)    {
+
+            // close socket and streams
+            in.close();
+            socket.close();
+        } catch (IOException e) {
             e.printStackTrace();
-        }   finally {
-            try {
-                socketInput.close();
-                socket.close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 }
