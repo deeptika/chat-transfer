@@ -10,7 +10,7 @@ public class Chat {
         ServerSocket localSocket = new ServerSocket(0);
 
         // starting server
-        System.out.println(localSocket.getLocalSocketAddress() + " started!\nListening on port " + localSocket.getLocalPort());
+        System.out.println(localSocket.getLocalSocketAddress() + "'s program started! Listening on port " + localSocket.getLocalPort());
 
         // start write thread
         new WriteThread().start();
@@ -25,28 +25,36 @@ public class Chat {
 }
 
 class WriteThread extends Thread {
-    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in)); // to read socket input
-    private String message;    //message received from the remote port
+    BufferedReader standardInput;  // to read socket input
+    BufferedReader socketInput;
     private Socket remoteSocket; //socket that listens to other user
-    ObjectOutputStream outputStream = null; // stream to write to the socket
-    String currentDirectory = "./"; // current working directory of this thread
+    private ObjectOutputStream outputStream; // stream to write to the socket
 
     public void run() {
         try {
+            standardInput = new BufferedReader(new InputStreamReader(System.in));
+
             // connect to other user's port
             System.out.println("What's the port of the user you'd like to connect to?");
-            remoteSocket = new Socket("localhost", Integer.parseInt(bufferedReader.readLine()));
+            remoteSocket = new Socket("localhost", Integer.parseInt(standardInput.readLine()));
             System.out.println("Connected to " + remoteSocket.getRemoteSocketAddress() + " successfully!\n");
 
             // reading message from output
-            while ((message = bufferedReader.readLine()) != null) {
-                outputStream = new ObjectOutputStream(remoteSocket.getOutputStream());
+            outputStream = new ObjectOutputStream(remoteSocket.getOutputStream());
+            standardInput = new BufferedReader(new InputStreamReader(remoteSocket.getInputStream()));
+            //message received from the remote port
+            String message;
+            while ((message = standardInput.readLine()) != null) {
+                // writing message to output stream
                 outputStream.writeObject(message);
+                outputStream.flush();
 
                 // handling command "transfer <fileName>"
                 if (message.startsWith("transfer")) {
                     String fileName = message.substring(9);
                     boolean flag = false;
+                    // current working directory of this thread
+                    String currentDirectory = "./";
                     File folder = new File(currentDirectory);
 
                     for (File file : Objects.requireNonNull(folder.listFiles())) {
@@ -55,6 +63,7 @@ class WriteThread extends Thread {
                             flag = true;
                             byte[] content = Files.readAllBytes(file.toPath());
                             outputStream.writeObject(content);
+                            outputStream.flush();
                             System.out.println("File " + file.getName() + " transferred successfully!");
                         }
                     }
@@ -69,7 +78,8 @@ class WriteThread extends Thread {
             try {
                 outputStream.flush();
                 outputStream.close();
-                bufferedReader.close();
+                socketInput.close();
+                remoteSocket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -78,9 +88,8 @@ class WriteThread extends Thread {
 }
 
 class ReadThread extends Thread {
-    BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(System.in)); // to receive input from user
-    ObjectInputStream inputStream = null; // stream to read socket input
-    private String message;    // message received from the client
+    BufferedReader socketInput; // to receive input from user
+    ObjectInputStream inputStream; // stream to read socket input
     private final Socket socket;    // socket that listens to client
     String currentDirectory = "./"; // current working directory of this thread
 
@@ -90,7 +99,13 @@ class ReadThread extends Thread {
 
     public void run()   {
         try {
-            while ((message = bufferedReader.readLine()) != null) {
+            // reading incoming messages
+            socketInput = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            // message received from the client
+            String message;
+            while ((message = socketInput.readLine()) != null) {
+
+                // handling file transfer - obtaining transferred file and storing it
                 if (message.startsWith("transfer")) {
                     inputStream = new ObjectInputStream(socket.getInputStream());
                     String fileName = message.substring(9);
@@ -99,6 +114,7 @@ class ReadThread extends Thread {
                     Files.write(file.toPath(), content);
                     System.out.println("File " + fileName + ": get is successful.");
                 } else {
+                    // printing messages to console
                     System.out.println(message);
                 }
             }
@@ -106,7 +122,8 @@ class ReadThread extends Thread {
             e.printStackTrace();
         }   finally {
             try {
-                bufferedReader.close();
+                socketInput.close();
+                socket.close();
             } catch (IOException e) {
                 e.printStackTrace();
             }
