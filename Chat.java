@@ -23,45 +23,60 @@ public class Chat {
 }
 
 class WriteThread extends Thread {
+    private BufferedReader standardInputStream; // stream to read user input
+    private Socket remoteSocket; // socket to represent another user thread
+    private PrintWriter outputStream; // output stream of current user's socket
+    private BufferedReader socketInputStream; // stream to read socket's input
     public void run() {
         try {
-            // connect to another user's port
-            BufferedReader stdIn = new BufferedReader(new InputStreamReader(System.in));
-            System.out.print("Enter port number to connect to: ");
-            int remotePort = Integer.parseInt(stdIn.readLine());
-            Socket socket = new Socket("localhost", remotePort);
-            System.out.println("\nConnected to: " + socket.getRemoteSocketAddress());
+            // connecting to another user
+            System.out.print("Which user would you like to connect with? Enter their port number: ");
 
-            // start file transfer or message sending loop
-            PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String userInput;
-            while ((userInput = stdIn.readLine()) != null) {
-                out.println(userInput);
-                if (userInput.startsWith("transfer ")) {
-                    String fileName = userInput.substring(9);
+            // getting details about the user's socket
+            standardInputStream = new BufferedReader(new InputStreamReader(System.in));
+            remoteSocket = new Socket("localhost", Integer.parseInt(standardInputStream.readLine()));
+            System.out.println("Connected to: " + remoteSocket.getRemoteSocketAddress());
+            outputStream = new PrintWriter(remoteSocket.getOutputStream(), true);
+            socketInputStream = new BufferedReader(new InputStreamReader(remoteSocket.getInputStream()));
+
+            // file transfer or message sending
+            String message;
+            while ((message = standardInputStream.readLine()) != null) {
+                // writing each message to the output stream
+                outputStream.println(message);
+
+                // handling file transfer
+                if (message.startsWith("transfer ")) {
+                    String fileName = message.substring(9);
                     File file = new File(fileName);
+
+                    // checking if file does not exist
                     if (!file.exists()) {
-                        System.out.println("File does not exist.");
+                        System.out.println("ERROR - File does not exist!");
                     } else {
                         FileInputStream fileInputStream = new FileInputStream(file);
                         byte[] buffer = new byte[1024];
-                        int bytesRead;
-                        while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-                            socket.getOutputStream().write(buffer, 0, bytesRead);
+                        int readPtr;
+                        // sending file to output stream
+                        while ((readPtr = fileInputStream.read(buffer)) != -1) {
+                            remoteSocket.getOutputStream().write(buffer, 0, readPtr);
                         }
-                        socket.getOutputStream().flush();
+                        remoteSocket.getOutputStream().flush();
                         fileInputStream.close();
                     }
                 }
             }
-
-            // close socket and streams
-            out.close();
-            in.close();
-            socket.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IOException ioException) {
+            System.out.println("ERROR - Unexpected error in sending message!");
+        } finally {
+            // closing streams and socket
+            outputStream.close();
+            try {
+                socketInputStream.close();
+                remoteSocket.close();
+            } catch (IOException ioException) {
+                System.out.println("ERROR - Cannot close sockets!");
+            }
         }
     }
 }
