@@ -6,18 +6,23 @@ import java.util.Objects;
 
 public class Chat {
     public static void main(String[] args) throws IOException {
-        // creating local socket
-        ServerSocket localSocket = new ServerSocket(0);
+        // using command line arguments to get username, port of user thread
+        if (args.length != 2) {
+            System.err.println("Wrong command. Try: java Chat <username> <port>");
+            System.exit(1);
+        }
+        String userName = args[0];
+        int port = Integer.parseInt(args[1]);
 
-        // starting server
-        System.out.println(localSocket.getLocalSocketAddress() + "'s program started!\nListening on port " + localSocket.getLocalPort());
+        // creating local socket and starting server
+        ServerSocket localSocket = new ServerSocket(port);
+        System.out.println(userName + "'s program started!\nListening on port " + port);
 
         // start write thread
-        new WriteThread().start();
+        new WriteThread(userName, port).start();
 
         // connecting to remote port
         Socket remoteSocket = localSocket.accept();
-        System.out.println("Obtained connection from " + remoteSocket.getRemoteSocketAddress() + " successfully!");
 
         // start read thread
         new ReadThread(remoteSocket).start();
@@ -25,10 +30,16 @@ public class Chat {
 }
 
 class WriteThread extends Thread {
+    private final String userName; // user name of thread
+    private final int port; // port of user
     private BufferedReader standardInputStream; // stream to read user input
     private Socket remoteSocket; // socket to represent another user thread
     private PrintWriter outputStream; // output stream of current user's socket
     private BufferedReader socketInputStream; // stream to read socket's input
+    public WriteThread(String username, int port) {
+        this.userName = username;
+        this.port = port;
+    }
     public void run() {
         try {
             // connecting to another user
@@ -37,24 +48,22 @@ class WriteThread extends Thread {
             // getting details about the user's socket
             standardInputStream = new BufferedReader(new InputStreamReader(System.in));
             remoteSocket = new Socket("localhost", Integer.parseInt(standardInputStream.readLine()));
-            System.out.println("Connected to: " + remoteSocket.getRemoteSocketAddress());
+            System.out.println("Connected to: " + remoteSocket.getPort());
             outputStream = new PrintWriter(remoteSocket.getOutputStream(), true);
             socketInputStream = new BufferedReader(new InputStreamReader(remoteSocket.getInputStream()));
 
             // file transfer or message sending
             String message;
             while ((message = standardInputStream.readLine()) != null) {
-                // writing each message to the output stream
-                outputStream.println(message);
-
                 // handling file transfer
                 if (message.startsWith("transfer ")) {
+                    outputStream.println(message);
                     String fileName = message.substring(9);
                     File file = new File(fileName);
 
                     // checking if file does not exist
                     if (!file.exists()) {
-                        System.out.println("ERROR - File does not exist!");
+                        System.err.println("File does not exist!");
                     } else {
                         FileInputStream fileInputStream = new FileInputStream(file);
                         byte[] buffer = new byte[1024];
@@ -66,6 +75,9 @@ class WriteThread extends Thread {
                         remoteSocket.getOutputStream().flush();
                         fileInputStream.close();
                     }
+                } else {
+                    // writing each message to the output stream
+                    outputStream.println(userName + ": " + message);
                 }
             }
         } catch (IOException ioException) {
