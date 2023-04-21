@@ -1,6 +1,8 @@
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.util.Objects;
 
 public class Chat {
     public static void main(String[] args) throws IOException {
@@ -35,7 +37,7 @@ class WriteThread extends Thread {
             // getting details about the user's socket
             standardInputStream = new BufferedReader(new InputStreamReader(System.in));
             remoteSocket = new Socket("localhost", Integer.parseInt(standardInputStream.readLine()));
-            System.out.println("Connected to: " + remoteSocket.getRemoteSocketAddress());
+            System.out.println("Connected to: " + remoteSocket.getRemoteSocketAddress() + "\n");
             outputStream = new PrintWriter(remoteSocket.getOutputStream(), true);
             socketInputStream = new BufferedReader(new InputStreamReader(remoteSocket.getInputStream()));
 
@@ -70,7 +72,6 @@ class WriteThread extends Thread {
             System.out.println("ERROR - Unexpected error in sending message!");
         } finally {
             // closing streams and socket
-            outputStream.close();
             try {
                 socketInputStream.close();
                 remoteSocket.close();
