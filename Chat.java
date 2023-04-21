@@ -10,7 +10,7 @@ public class Chat {
         ServerSocket localSocket = new ServerSocket(0);
 
         // starting server
-        System.out.println(localSocket.getLocalSocketAddress() + "'s program started! Listening on port " + localSocket.getLocalPort());
+        System.out.println(localSocket.getLocalSocketAddress() + "'s program started!\nListening on port " + localSocket.getLocalPort());
 
         // start write thread
         new WriteThread().start();
@@ -32,12 +32,12 @@ class WriteThread extends Thread {
     public void run() {
         try {
             // connecting to another user
-            System.out.print("Which user would you like to connect with? Enter their port number: ");
+            System.out.print("Which user would you like to connect with? Enter their port number:\n");
 
             // getting details about the user's socket
             standardInputStream = new BufferedReader(new InputStreamReader(System.in));
             remoteSocket = new Socket("localhost", Integer.parseInt(standardInputStream.readLine()));
-            System.out.println("Connected to: " + remoteSocket.getRemoteSocketAddress() + "\n");
+            System.out.println("Connected to: " + remoteSocket.getRemoteSocketAddress());
             outputStream = new PrintWriter(remoteSocket.getOutputStream(), true);
             socketInputStream = new BufferedReader(new InputStreamReader(remoteSocket.getInputStream()));
 
@@ -58,10 +58,10 @@ class WriteThread extends Thread {
                     } else {
                         FileInputStream fileInputStream = new FileInputStream(file);
                         byte[] buffer = new byte[1024];
-                        int readPtr;
+                        int writePtr;
                         // sending file to output stream
-                        while ((readPtr = fileInputStream.read(buffer)) != -1) {
-                            remoteSocket.getOutputStream().write(buffer, 0, readPtr);
+                        while ((writePtr = fileInputStream.read(buffer)) != -1) {
+                            remoteSocket.getOutputStream().write(buffer, 0, writePtr);
                         }
                         remoteSocket.getOutputStream().flush();
                         fileInputStream.close();
@@ -69,21 +69,22 @@ class WriteThread extends Thread {
                 }
             }
         } catch (IOException ioException) {
-            System.out.println("ERROR - Unexpected error in sending message!");
+            System.err.println("Unexpected error in sending message!");
         } finally {
             // closing streams and socket
             try {
                 socketInputStream.close();
                 remoteSocket.close();
             } catch (IOException ioException) {
-                System.out.println("ERROR - Cannot close sockets!");
+                System.err.println("Cannot close sockets!");
             }
         }
     }
 }
 
 class ReadThread extends Thread {
-    private Socket socket;
+    private Socket socket; // socket that reads incoming messages
+    private BufferedReader socketInputStream; // input stream of socket
 
     public ReadThread(Socket socket) {
         this.socket = socket;
@@ -92,28 +93,36 @@ class ReadThread extends Thread {
     public void run() {
         try {
             // read incoming messages and print them to the console
-            BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            String inputLine;
-            while ((inputLine = in.readLine()) != null) {
-                if (inputLine.startsWith("transfer ")) {
-                    String fileName = "new" + inputLine.substring(9);
+            socketInputStream = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            String message;
+            while ((message = socketInputStream.readLine()) != null) {
+
+                // handles incoming transferred file
+                if (message.startsWith("transfer ")) {
+                    String fileName = "new" + message.substring(9);
                     FileOutputStream fileOutputStream = new FileOutputStream(fileName);
                     byte[] buffer = new byte[1024];
                     int bytesRead;
+
+                    // storing file
                     while ((bytesRead = socket.getInputStream().read(buffer)) != -1) {
                         fileOutputStream.write(buffer, 0, bytesRead);
                     }
                     fileOutputStream.close();
                 } else {
-                    System.out.println(inputLine);
+                    // displaying message
+                    System.out.println(message);
                 }
             }
-
-            // close socket and streams
-            in.close();
-            socket.close();
         } catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Unexpected error in receiving message!");
+        } finally {
+            // closing socket
+            try {
+                socketInputStream.close();
+            } catch(IOException e)  {
+                System.err.println("Cannot close sockets!");
+            }
         }
     }
 }
