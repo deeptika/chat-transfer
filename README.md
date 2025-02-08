@@ -2,37 +2,70 @@
 
 **Purpose:** CNT-5106 Computer Networks - Project 2 - University of Florida
 
-Chat Transfer is a Java-based project that facilitates the transfer of chat data. This README provides an overview of the project and instructions for getting started.
-
-## Project Overview
-
-The Chat Transfer project comprises a Java file named `Chat.java`, which likely contains the core functionality for transferring chat data. While specific details about the implementation are not provided in the search results, we can infer that this project aims to provide a solution for moving or copying chat conversations between different platforms or systems.
+This is a simple Java-based chat application that allows two users to communicate over a network connection. The application supports text messaging and file transfer between users.
 
 ## Features
 
-- Chat data transfer functionality
-- Java-based implementation
+- Text messaging between two users
+- File transfer capability
+- Multi-threaded design for simultaneous reading and writing
 
-## Getting Started
+## Prerequisites
 
-To use this project, follow these steps:
+- Java Development Kit (JDK) 8 or higher
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/deeptika/chat-transfer.git
-   ```
+## How to Use
 
-2. Navigate to the project directory:
-   ```bash
-   cd chat-transfer
-   ```
-
-3. Compile the Java file:
+1. Compile the Java file:
    ```bash
    javac Chat.java
    ```
 
-4. Run the program:
+2. Run the application for each user:
    ```bash
-   java Chat
+   java Chat <username> <port>
    ```
+   Replace `<username>` with the desired username and `<port>` with the port number to listen on.
+
+3. When prompted, enter the port number of the user you want to connect with.
+
+4. Start chatting! Type messages and press Enter to send.
+
+5. To transfer a file, use the command:
+   ```
+   transfer <filename>
+   ```
+   Replace `<filename>` with the name of the file you want to send.
+
+## Class Structure
+
+### Chat
+
+The main class that initializes the application and sets up the connection.
+
+### WriteThread
+
+Handles outgoing messages and file transfers.
+
+### ReadThread
+
+Manages incoming messages and file receptions.
+
+## Notes
+
+- The application uses localhost for connections, so it's designed for use on a single machine or local network.
+- Received files are saved with "new" prefixed to the original filename.
+- Error handling is implemented for various scenarios like file not found or connection issues.
+
+## Limitations
+
+- The application currently supports only two users.
+- File transfer doesn't show progress or completion status.
+- The application doesn't have a graphical user interface.
+
+## Future Improvements
+
+- Add support for multiple users
+- Implement a graphical user interface
+- Enhance file transfer with progress indicators and confirmation messages
+- Add encryption for secure communication
